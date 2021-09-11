@@ -1,0 +1,3 @@
+[submodule "lib/TimedBlink"]
+	path = lib/TimedBlink
+	url = https://github.com/aegis1980/TimedBlink
