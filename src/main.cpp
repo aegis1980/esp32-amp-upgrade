@@ -2,6 +2,7 @@
 #include "BluetoothA2DPSink.h"
 #include "avdweb_Switch.h"
 #include <Ticker.h>
+#include "Blinker.h"
 #include "firmware.h"
 
 #define POWER_RELAY_PIN 23
@@ -36,23 +37,23 @@ bool bt_connection = false;
 Ticker btConnectionTicker;
 Ticker btnPollTicker;
 
-Ticker ledBT;
-Ticker ledPower;
 
 // LED blinkers
 
 /**
- * 111111111111111111 :device connected
- * --11--11--11--11-- : no device connected. Accepting connections.
+ * 1111111111111111  : device connected
+ * 1111----1111----- : no device connected. Accepting connections.
  */
-TimedBlink btLED(LED_BT_CONNECTION_PIN);
+Blinker btLED(LED_BT_CONNECTION_PIN);
 
 /**
- * 111111111111111111 :on
- * --11--11--11--11-- : going to enter standby since not datastream
- * ----11111----11111 :standby
+ * ---------------- :on
+ * 1111----1111---- : entering standby
+ * 1111111111111111  : in standby
  */
-TimedBlink standbyLED(LED_STANDBY_PIN); 
+Blinker standbyLED(LED_STANDBY_PIN); 
+
+
 
 
 Switch ctrlBtn(CONTROL_BTN_PIN);
@@ -73,10 +74,12 @@ void longPress(void* ref) {
     btLED.resume();
     standbyLED.resume();
   } else {
+    btLED.snapshot();
+    standbyLED.snapshot();
     enterFirmwareFlashMode();
     firmwareMode = true;
-    btLED.blink(100,100);
-    standbyLED.blink(100,100);
+    btLED.blink(1,0.5);
+    standbyLED.blink(0.5,1);
 
   }
 }
@@ -94,7 +97,7 @@ void doubleClick(void* ref) {
   /*
   *  disable/ enable toggle autostandby mode
   */
-  autoStandby = !autoStandby;
+  ESP.restart();
 }
 
 /** INput selector on AUX*/ 
@@ -121,7 +124,7 @@ void btConnectionCheck(){
     if (bt_connection) {
       btLED.continuousOn();
     } else {
-      btLED.blink(200,200);
+      btLED.blink(1,1);
     }
     last_state = state;
   }
@@ -145,8 +148,6 @@ void setup() {
   btnPollTicker.attach(20/1000,buttonPoll);
 
   pinMode(POWER_RELAY_PIN, OUTPUT);
-  pinMode(LED_BT_CONNECTION_PIN, OUTPUT);
-  pinMode(LED_STANDBY_PIN,OUTPUT); 
 
   ctrlBtn.longPressPeriod = 2 * 1000; // 2secs instead of the default 300ms
   ctrlBtn.setLongPressCallback(&longPress, (void*)"long press");
@@ -164,10 +165,10 @@ void loop() {
     bt_datastream = false;
   } else {
     if (shutdown_ms - millis() < MILLISECONDS_TO_STANDBY){
-      standbyLED.blink(200,200);
+      standbyLED.blink(1,1);
       powerMode = POWER_ENTERING_STANDBY;
     } else {
-      standbyLED.continuousOn();
+      standbyLED.continuousOff();
       powerMode = POWER_ON;
     }
     bt_datastream = true;
@@ -175,16 +176,15 @@ void loop() {
 
   if (autoStandby){
     if (bt_connection && bt_datastream){
-      digitalWrite(POWER_RELAY_PIN, LOW);    
+      digitalWrite(POWER_RELAY_PIN, LOW); //on
     } else {
-      digitalWrite(POWER_RELAY_PIN, HIGH);
+      digitalWrite(POWER_RELAY_PIN, HIGH); //off
       powerMode = POWER_STANDBY;
-      standbyLED.blink(1000,1000);
+      standbyLED.continuousOn();
     }
   } else {
-    standbyLED.blinkOff();
+    standbyLED.continuousOff();
+    digitalWrite(POWER_RELAY_PIN, LOW); //on
   }
 
-  btLED.blink();
-  standbyLED.blink();
 }
