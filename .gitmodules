@@ -1,0 +1,3 @@
+[submodule "lib/esp32-blinker"]
+	path = lib/esp32-blinker
+	url = https://github.com/aegis1980/esp32-blinker.git
