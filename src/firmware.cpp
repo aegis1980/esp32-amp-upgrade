@@ -7,6 +7,11 @@
 
 Ticker otaHandler;
 
+
+void handle(){
+    ArduinoOTA.handle();
+}
+
 void exitFirmwareFlashMode(){
   otaHandler.detach();
   WiFi.disconnect(true);
@@ -14,21 +19,21 @@ void exitFirmwareFlashMode(){
 
 
 void enterFirmwareFlashMode(){
+    Serial.println("enterFirmwareFlashMode");
     WiFi.mode(WIFI_STA);
     WiFi.begin(SSID, PASSWORD);
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        Serial.println("Connection Failed! Rebooting...");
-        delay(5000);
-        ESP.restart();
+      Serial.println("Connection Failed!");
+      //delay(3000);
+      //ESP.restart();
     }
 
-    if (!MDNS.begin(DEVICE_NAME)) {
-      Serial.println("Error setting up MDNS responder!");
-      while(1){
-          delay(1000);
-      }
-    }
-
+   // if (!MDNS.begin(DEVICE_NAME)) {
+   //   Serial.println("Error setting up MDNS responder!");
+   //   while(1){
+   //       delay(1000);
+   //   }
+   // }
     ArduinoOTA.setHostname(DEVICE_NAME);
 
     ArduinoOTA
@@ -46,7 +51,7 @@ void enterFirmwareFlashMode(){
       Serial.println("\nEnd");
        Serial.println("Restarting device in 3 seconds.");
       delay(3000);
-      ESP.restart();
+      //ESP.restart();
     })
     .onProgress([](unsigned int progress, unsigned int total) {
       Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
@@ -67,10 +72,6 @@ void enterFirmwareFlashMode(){
   Serial.println(WiFi.localIP());
 
   Serial.println("Starting ota handler");
-  otaHandler.attach(0.1,handle);
+  otaHandler.attach(0.1f,handle);
 
-}
-
-void handle(){
-    ArduinoOTA.handle();
 }

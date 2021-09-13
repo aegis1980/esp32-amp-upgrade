@@ -3,7 +3,9 @@
 #include "avdweb_Switch.h"
 #include <Ticker.h>
 #include "Blinker.h"
+#include "config.h"
 #include "firmware.h"
+#include "esp_log.h"
 
 #define POWER_RELAY_PIN 23
 #define LED_BT_CONNECTION_PIN 19
@@ -15,12 +17,13 @@
 #define POWER_ENTERING_STANDBY 1
 #define POWER_ON 2
 
+#define MEDIUM_BLINK 0.5f
+#define SHORT_BLINK 0.15f
+#define LONG_BLINK 1.0f
 
 BluetoothA2DPSink a2dp_sink;
-esp_a2d_connection_state_t last_state;
 
-
-unsigned long SECOND_BTCXN_CHECK =0.5; 
+float SECOND_BTCXN_CHECK = 1.0f; 
 unsigned long MILLISECONDS_TO_STANDBY = 10*1000;
 
 int powerMode = POWER_ON;
@@ -34,9 +37,7 @@ bool firmwareMode = false;
 bool bt_datastream = false;
 bool bt_connection = false;
 
-Ticker btConnectionTicker;
 Ticker btnPollTicker;
-
 
 // LED blinkers
 
@@ -53,9 +54,6 @@ Blinker btLED(LED_BT_CONNECTION_PIN);
  */
 Blinker standbyLED(LED_STANDBY_PIN); 
 
-
-
-
 Switch ctrlBtn(CONTROL_BTN_PIN);
 Switch inputSelector(BT_SELECTOR_PIN);
 
@@ -64,74 +62,17 @@ void on_data() {
   shutdown_ms = millis() + MILLISECONDS_TO_STANDBY; 
 }
 
-void longPress(void* ref) {
-  /*
-  * disable/ enable wifi firmware updating
-  */
-  if (firmwareMode){
-    exitFirmwareFlashMode();
-    firmwareMode = false;
-    btLED.resume();
-    standbyLED.resume();
-  } else {
-    btLED.snapshot();
-    standbyLED.snapshot();
-    enterFirmwareFlashMode();
-    firmwareMode = true;
-    btLED.blink(1,0.5);
-    standbyLED.blink(0.5,1);
-
-  }
+void onBTConnect(){
+  btLED.continuousOn();
+  bt_connection = true;
 }
 
-void singleClick(void* ref) {
-  /*
-  * bring out of standby.
-  */
-  if (powerMode == POWER_STANDBY || powerMode == POWER_ENTERING_STANDBY){
-    on_data();
-  } 
+void onBTDisconnect(){
+  if (!firmwareMode) btLED.blink(MEDIUM_BLINK,MEDIUM_BLINK);
+  bt_connection = false;
 }
 
-void doubleClick(void* ref) {
-  /*
-  *  disable/ enable toggle autostandby mode
-  */
-  ESP.restart();
-}
-
-/** INput selector on AUX*/ 
-void selectorActive(void* ref){
-  autoStandby = true;
-}
-
-/** INput selector on AUX*/
-void selectorInactive(void* ref){
-  autoStandby = false;
-}
-
-void buttonPoll(){
-  ctrlBtn.poll();
-  inputSelector.poll();
-}
-
-void btConnectionCheck(){
-  esp_a2d_connection_state_t state = a2dp_sink.get_connection_state();
-
-  if (last_state != state){
-    bt_connection = state == ESP_A2D_CONNECTION_STATE_CONNECTED;
-    Serial.println(bt_connection ? "Connected" : "Not connected");  
-    if (bt_connection) {
-      btLED.continuousOn();
-    } else {
-      btLED.blink(1,1);
-    }
-    last_state = state;
-  }
-}
-
-
-void setup() {
+void connectA2DPSink(){
   i2s_pin_config_t my_pin_config = {
     .bck_io_num = 26,
     .ws_io_num = 25,
@@ -141,50 +82,108 @@ void setup() {
   a2dp_sink.set_pin_config(my_pin_config);
   // startup sink
   a2dp_sink.set_on_data_received(on_data);
-  a2dp_sink.start("Yamaha amp");
+  a2dp_sink.set_on_connected2BT(onBTConnect);
+  a2dp_sink.set_on_disconnected2BT(onBTDisconnect);
+  a2dp_sink.start("Yamaha amp",true);
+  btLED.blink(MEDIUM_BLINK,MEDIUM_BLINK);
+}
+
+void longPressAtStartUp(){
+    firmwareMode = true;
+    Serial.println("Entering firmware mode");
+    btLED.blink(SHORT_BLINK,SHORT_BLINK);
+    standbyLED.blink(SHORT_BLINK,SHORT_BLINK);
+    enterFirmwareFlashMode();
+}
+
+void longPress(void* ref) {
+  /*
+  * Disconnect current BT device to free up for another one.
+  */
+  Serial.println("Long press");
+  a2dp_sink.disconnect();
+}
+
+void singleClick(void* ref) {
+  /*
+  * bring out of standby.
+  */
+  Serial.println("Single click");
+  if (powerMode == POWER_STANDBY || powerMode == POWER_ENTERING_STANDBY){
+    on_data();
+  } 
+}
 
 
-  btConnectionTicker.attach(SECOND_BTCXN_CHECK,btConnectionCheck);
-  btnPollTicker.attach(20/1000,buttonPoll);
+/** INput selector on AUX*/ 
+void selectorActive(void* ref){
+  autoStandby = true;
+}
 
-  pinMode(POWER_RELAY_PIN, OUTPUT);
+/** INput selector off AUX*/
+void selectorInactive(void* ref){
+  autoStandby = false;
+}
 
-  ctrlBtn.longPressPeriod = 2 * 1000; // 2secs instead of the default 300ms
-  ctrlBtn.setLongPressCallback(&longPress, (void*)"long press");
-  ctrlBtn.setDoubleClickCallback(&doubleClick, (void*)"double click");
-  ctrlBtn.setSingleClickCallback(&singleClick, (void*)"single click");
+void buttonPoll(){
+  ctrlBtn.poll();
+  inputSelector.poll();
+}
 
-  //inputSelector.setPushedCallback(&selectorActive, (void*)"pushed");
-  //inputSelector.setReleasedCallback(&selectorInactive, (void*)"released");
 
+void setup() {
+  if (DEBUG){
+    Serial.begin(115200); // open the serial port at 9600 bps:
+    esp_log_level_set("*", ESP_LOG_VERBOSE);
+  } 
+
+  pinMode(CONTROL_BTN_PIN, INPUT);
+  if (digitalRead(CONTROL_BTN_PIN) == HIGH){
+    longPressAtStartUp();
+  } else {
+    connectA2DPSink();
+    btnPollTicker.attach(20.0/1000.0,buttonPoll);
+
+    pinMode(POWER_RELAY_PIN, OUTPUT);
+
+    ctrlBtn.longPressPeriod = 1000; // 2secs instead of the default 300ms
+    ctrlBtn.setLongPressCallback(&longPress, (void*)"long press");
+    ctrlBtn.setSingleClickCallback(&singleClick, (void*)"single click");
+
+    //inputSelector.setPushedCallback(&selectorActive, (void*)"pushed");
+    //inputSelector.setReleasedCallback(&selectorInactive, (void*)"released");
+  }
 }
 
 void loop() {
   // check datastream timeout
-  if (millis()>shutdown_ms){
-    bt_datastream = false;
-  } else {
-    if (shutdown_ms - millis() < MILLISECONDS_TO_STANDBY){
-      standbyLED.blink(1,1);
-      powerMode = POWER_ENTERING_STANDBY;
+  if (!firmwareMode){
+    if (millis()>shutdown_ms){
+      bt_datastream = false;
+    } else {
+      if (shutdown_ms - millis() < MILLISECONDS_TO_STANDBY){
+        standbyLED.blink(MEDIUM_BLINK,MEDIUM_BLINK);
+        powerMode = POWER_ENTERING_STANDBY;
+      } else {
+        standbyLED.continuousOff();
+        powerMode = POWER_ON;
+      }
+      bt_datastream = true;
+    }
+
+    if (autoStandby){
+      if (bt_connection && bt_datastream){
+        digitalWrite(POWER_RELAY_PIN, HIGH); //on
+      } else {
+        digitalWrite(POWER_RELAY_PIN, LOW); //off
+        powerMode = POWER_STANDBY;
+        standbyLED.continuousOn();
+      }
     } else {
       standbyLED.continuousOff();
-      powerMode = POWER_ON;
+      digitalWrite(POWER_RELAY_PIN, HIGH); //on
     }
-    bt_datastream = true;
   }
-
-  if (autoStandby){
-    if (bt_connection && bt_datastream){
-      digitalWrite(POWER_RELAY_PIN, LOW); //on
-    } else {
-      digitalWrite(POWER_RELAY_PIN, HIGH); //off
-      powerMode = POWER_STANDBY;
-      standbyLED.continuousOn();
-    }
-  } else {
-    standbyLED.continuousOff();
-    digitalWrite(POWER_RELAY_PIN, LOW); //on
-  }
+  
 
 }
