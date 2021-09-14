@@ -5,6 +5,7 @@
 #include "Blinker.h"
 #include "config.h"
 #include "firmware.h"
+#include <ArduinoOTA.h>
 #include "esp_log.h"
 
 #define POWER_RELAY_PIN 23
@@ -84,7 +85,7 @@ void connectA2DPSink(){
   a2dp_sink.set_on_data_received(on_data);
   a2dp_sink.set_on_connected2BT(onBTConnect);
   a2dp_sink.set_on_disconnected2BT(onBTDisconnect);
-  a2dp_sink.start("Yamaha amp",true);
+  a2dp_sink.start(DEVICE_NAME,true);
   btLED.blink(MEDIUM_BLINK,MEDIUM_BLINK);
 }
 
@@ -138,7 +139,7 @@ void setup() {
   } 
 
   pinMode(CONTROL_BTN_PIN, INPUT);
-  if (digitalRead(CONTROL_BTN_PIN) == HIGH){
+  if (digitalRead(CONTROL_BTN_PIN) == LOW){
     longPressAtStartUp();
   } else {
     connectA2DPSink();
@@ -150,8 +151,8 @@ void setup() {
     ctrlBtn.setLongPressCallback(&longPress, (void*)"long press");
     ctrlBtn.setSingleClickCallback(&singleClick, (void*)"single click");
 
-    //inputSelector.setPushedCallback(&selectorActive, (void*)"pushed");
-    //inputSelector.setReleasedCallback(&selectorInactive, (void*)"released");
+    inputSelector.setPushedCallback(&selectorActive, (void*)"pushed");
+    inputSelector.setReleasedCallback(&selectorInactive, (void*)"released");
   }
 }
 
@@ -183,6 +184,8 @@ void loop() {
       standbyLED.continuousOff();
       digitalWrite(POWER_RELAY_PIN, HIGH); //on
     }
+  } else {
+    ArduinoOTA.handle();
   }
   
 
