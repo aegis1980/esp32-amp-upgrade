@@ -56,7 +56,7 @@ Blinker btLED(LED_BT_CONNECTION_PIN);
 Blinker standbyLED(LED_STANDBY_PIN); 
 
 Switch ctrlBtn(CONTROL_BTN_PIN);
-Switch inputSelector(BT_SELECTOR_PIN);
+//Switch inputSelector(BT_SELECTOR_PIN);
 
 // move shutdown time to future
 void on_data() {
@@ -113,22 +113,29 @@ void singleClick(void* ref) {
   if (powerMode == POWER_STANDBY || powerMode == POWER_ENTERING_STANDBY){
     on_data();
   } 
+
+  if (autoStandby) {
+    autoStandby = false;
+    
+  } else {
+    autoStandby = true;
+  }
 }
 
 
 /** INput selector on AUX*/ 
-void selectorActive(void* ref){
-  autoStandby = true;
-}
+//void selectorActive(void* ref){
+ // autoStandby = true;
+//}
 
 /** INput selector off AUX*/
-void selectorInactive(void* ref){
-  autoStandby = false;
-}
+//void selectorInactive(void* ref){
+ // autoStandby = false;
+//}
 
 void buttonPoll(){
   ctrlBtn.poll();
-  inputSelector.poll();
+ // inputSelector.poll();
 }
 
 
@@ -151,8 +158,8 @@ void setup() {
     ctrlBtn.setLongPressCallback(&longPress, (void*)"long press");
     ctrlBtn.setSingleClickCallback(&singleClick, (void*)"single click");
 
-    inputSelector.setPushedCallback(&selectorActive, (void*)"pushed");
-    inputSelector.setReleasedCallback(&selectorInactive, (void*)"released");
+    //inputSelector.setPushedCallback(&selectorActive, (void*)"pushed");
+    //inputSelector.setReleasedCallback(&selectorInactive, (void*)"released");
   }
 }
 
