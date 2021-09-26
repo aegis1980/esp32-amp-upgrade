@@ -8,6 +8,15 @@
 Ticker otaHandler;
 
 
+/**
+ * @brief call back to otaHandler
+ * 
+ */
+void handle(){
+  ArduinoOTA.handle();
+}
+
+
 void exitFirmwareFlashMode(){
   otaHandler.detach();
   WiFi.disconnect(true);
@@ -63,5 +72,6 @@ void enterFirmwareFlashMode(){
   Serial.println(WiFi.localIP());
 
   Serial.println("Starting ota handler");
+  otaHandler.attach(0.01f,handle);
 
 }

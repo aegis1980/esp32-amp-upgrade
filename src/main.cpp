@@ -11,7 +11,8 @@
 #define POWER_RELAY_PIN 23
 #define LED_BT_CONNECTION_PIN 19
 #define LED_STANDBY_PIN 18
-#define BT_SELECTOR_PIN 5 // wired into original amp selector (closed on AUX, open otherwise)
+#define LED_MAIN_POWER_PIN 18
+#define BT_SELECTOR_PIN 5 // microswitch onto existing selector 
 #define CONTROL_BTN_PIN 17 
 
 #define POWER_STANDBY 0
@@ -43,20 +44,31 @@ Ticker btnPollTicker;
 // LED blinkers
 
 /**
+ * Blue led
  * 1111111111111111  : device connected
  * 1111----1111----- : no device connected. Accepting connections.
  */
 Blinker btLED(LED_BT_CONNECTION_PIN);
 
 /**
- * ---------------- :on
- * 1111----1111---- : entering standby
- * 1111111111111111  : in standby
+ * Green LED - auto standby mode
+ * ---------------- :off
+ * 1111----1111---- : entering standby (no stream detected)
+ * 1111111111111111  : auto mode on
  */
 Blinker standbyLED(LED_STANDBY_PIN); 
 
+/**
+ * Replaces main red power LED
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * continuous on - power on (relay)
+ * continuous off - power off (relay)
+ * blinking - in standby 
+ */
+Blinker powerLED(LED_MAIN_POWER_PIN);
+
 Switch ctrlBtn(CONTROL_BTN_PIN);
-//Switch inputSelector(BT_SELECTOR_PIN);
+Switch inputSelector(BT_SELECTOR_PIN);
 
 // move shutdown time to future
 void on_data() {
@@ -92,6 +104,7 @@ void connectA2DPSink(){
 void longPressAtStartUp(){
     firmwareMode = true;
     Serial.println("Entering firmware mode");
+    powerLED.blink(SHORT_BLINK,SHORT_BLINK);
     btLED.blink(SHORT_BLINK,SHORT_BLINK);
     standbyLED.blink(SHORT_BLINK,SHORT_BLINK);
     enterFirmwareFlashMode();
@@ -116,7 +129,6 @@ void singleClick(void* ref) {
 
   if (autoStandby) {
     autoStandby = false;
-    
   } else {
     autoStandby = true;
   }
@@ -124,18 +136,18 @@ void singleClick(void* ref) {
 
 
 /** INput selector on AUX*/ 
-//void selectorActive(void* ref){
- // autoStandby = true;
-//}
+void selectorActive(void* ref){
+  autoStandby = true;
+}
 
 /** INput selector off AUX*/
-//void selectorInactive(void* ref){
- // autoStandby = false;
-//}
+void selectorInactive(void* ref){
+  autoStandby = false;
+}
 
 void buttonPoll(){
   ctrlBtn.poll();
- // inputSelector.poll();
+  inputSelector.poll();
 }
 
 
@@ -158,8 +170,8 @@ void setup() {
     ctrlBtn.setLongPressCallback(&longPress, (void*)"long press");
     ctrlBtn.setSingleClickCallback(&singleClick, (void*)"single click");
 
-    //inputSelector.setPushedCallback(&selectorActive, (void*)"pushed");
-    //inputSelector.setReleasedCallback(&selectorInactive, (void*)"released");
+    inputSelector.setPushedCallback(&selectorActive, (void*)"pushed");
+    inputSelector.setReleasedCallback(&selectorInactive, (void*)"released");
   }
 }
 
@@ -182,18 +194,15 @@ void loop() {
     if (autoStandby){
       if (bt_connection && bt_datastream){
         digitalWrite(POWER_RELAY_PIN, HIGH); //on
-      } else {
+        powerLED.continuousOn();
+      } else { //
         digitalWrite(POWER_RELAY_PIN, LOW); //off
         powerMode = POWER_STANDBY;
-        standbyLED.continuousOn();
+        powerLED.blink(MEDIUM_BLINK, MEDIUM_BLINK);
       }
     } else {
-      standbyLED.continuousOff();
       digitalWrite(POWER_RELAY_PIN, HIGH); //on
+      powerLED.continuousOn();
     }
-  } else {
-    ArduinoOTA.handle();
-  }
-  
-
+  } 
 }
