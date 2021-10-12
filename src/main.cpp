@@ -9,9 +9,9 @@
 #include "esp_log.h"
 
 #define POWER_RELAY_PIN 23
-#define LED_BT_CONNECTION_PIN 19
-#define LED_STANDBY_PIN 18
-#define LED_MAIN_POWER_PIN 18
+#define LED_BT_CONNECTION_PIN 19 //blue LED
+#define LED_STANDBY_PIN 21  //green LED
+#define LED_MAIN_POWER_PIN 18 //red LED
 #define BT_SELECTOR_PIN 5 // microswitch onto existing selector 
 #define CONTROL_BTN_PIN 17 
 
@@ -135,12 +135,12 @@ void singleClick(void* ref) {
 }
 
 
-/** INput selector on AUX*/ 
+/** Input selector on TAPE/DAT 2 (ie bluetooth input)*/ 
 void selectorActive(void* ref){
   autoStandby = true;
 }
 
-/** INput selector off AUX*/
+/** INput selector off TAPE/DAT 2 (ie bluetooth input)*/
 void selectorInactive(void* ref){
   autoStandby = false;
 }
