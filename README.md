@@ -3,7 +3,5 @@
 Specifically for a Kenwood KA-3020SE (~1994) but could be modified for similar era analog stereo amps.
 
 * Adds BlueTooth streaming via one of amp's 6 RCA inputs.
-* 'Standby' when no BT audio signal - ie turns of main amp.
+* 'Standby' when no BT audio signal - ie turns off main amp.
 * OTA wifi firmware updating.
-
-For more info see here.
